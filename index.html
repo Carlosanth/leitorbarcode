@@ -4,8 +4,12 @@
   <meta charset="UTF-8">
   <title>Leitor de Código de Barras</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Biblioteca usada para ler código de barras pela câmera -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
+
   <style>
+    /* Estilo geral do corpo da página */
     body {
       font-family: Arial, sans-serif;
       background-color: #f2f2f2;
@@ -14,10 +18,12 @@
       text-align: center;
     }
 
+    /* Título principal */
     h2 {
       margin-bottom: 10px;
     }
 
+    /* Área do vídeo da câmera */
     #scanner-container {
       width: 100%;
       max-width: 100%;
@@ -28,18 +34,21 @@
       background-color: black;
     }
 
+    /* Vídeo da câmera */
     #video {
       width: 100%;
       height: 100%;
       object-fit: cover;
     }
 
+    /* Controle de zoom */
     #zoomControl {
       margin: 15px auto;
       width: 90%;
       max-width: 400px;
     }
 
+    /* Área onde os códigos são listados */
     #output {
       margin: 10px auto;
       padding: 10px;
@@ -48,16 +57,44 @@
       border-radius: 10px;
       box-shadow: 0 0 10px rgba(0,0,0,0.2);
       text-align: left;
-      max-height: 200px;
+      max-height: 250px;
       overflow-y: auto;
     }
 
-    button, input[type=range] {
+    /* Cada entrada de código */
+    .code-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #eaeaea;
+      padding: 5px 10px;
+      margin: 5px 0;
+      border-radius: 6px;
+    }
+
+    /* Botão de remover código (X) */
+    .remove-btn {
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 25px;
+      height: 25px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* Botões e inputs gerais */
+    button, input[type=range], input[type=text] {
       margin: 10px;
       padding: 10px 20px;
       font-size: 1em;
       border-radius: 8px;
       border: none;
+    }
+
+    /* Estilo do botão */
+    button {
       background: #3498db;
       color: white;
       cursor: pointer;
@@ -67,67 +104,104 @@
       background-color: #2c80b4;
     }
 
+    /* Slider do zoom */
     input[type=range] {
       width: 100%;
     }
 
+    /* Área de input manual */
+    #manualInputSection {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    /* Campo de texto do input manual */
+    input[type=text] {
+      width: 60%;
+      padding: 8px;
+      margin-right: 5px;
+    }
+
+    /* Responsivo para celular */
     @media (max-width: 600px) {
       #output {
         width: 95%;
       }
 
-      button, input[type=range] {
+      button, input[type=range], input[type=text] {
         width: 90%;
+      }
+
+      input[type=text] {
+        margin-right: 0;
+        margin-bottom: 10px;
       }
     }
   </style>
 </head>
 <body>
 
+  <!-- Título -->
   <h2>📷 Leitor de Código de Barras</h2>
 
-  <button id="startButton">▶️ Iniciar Leitura</button>
+  <!-- Botão para iniciar o scanner -->
+  <button id="startButton">▶️ Iniciar Leitura</button> <!-- <- Clique aqui para começar a leitura da câmera -->
 
+  <!-- Container onde a câmera aparece -->
   <div id="scanner-container" style="display:none">
-    <video id="video" autoplay></video>
+    <video id="video" autoplay></video> <!-- <- Aqui mostra a câmera ao vivo -->
   </div>
 
+  <!-- Controle de zoom da câmera -->
   <div id="zoomControl" style="display:none">
     <label for="zoomRange">Zoom: <span id="zoomValue">2.0</span>x</label><br>
-    <input type="range" id="zoomRange" min="1" max="3" step="0.1" value="2">
+    <input type="range" id="zoomRange" min="1" max="3" step="0.1" value="2"> <!-- <- Arraste para dar zoom -->
   </div>
 
-  <button onclick="downloadCSV()">📥 Baixar CSV</button>
+  <!-- Campo para digitar manualmente um código -->
+  <div id="manualInputSection">
+    <input type="text" id="manualCode" placeholder="Digite o código manualmente"> <!-- <- Digite um código aqui -->
+    <button onclick="addManualCode()">➕ Adicionar</button> <!-- <- Botão para adicionar o código digitado -->
+  </div>
 
+  <!-- Botão para baixar os códigos como CSV -->
+  <button onclick="downloadCSV()">📥 Baixar CSV</button> <!-- <- Gera um arquivo com todos os códigos -->
+
+  <!-- Área onde os códigos escaneados ou digitados são mostrados -->
   <div id="output">
     <h3>Códigos Lidos:</h3>
+    <div id="codeList"></div> <!-- <- Aqui os códigos vão aparecendo -->
   </div>
 
+  <!-- Som que toca quando um código é lido -->
   <audio id="beep-sound" src="https://www.soundjay.com/button/beep-07.wav" preload="auto"></audio>
 
+  <!-- Lógica JavaScript -->
   <script>
-    const codeReader = new ZXing.BrowserBarcodeReader();
+    const codeReader = new ZXing.BrowserBarcodeReader(); // <- Biblioteca que lê os códigos
     const videoElement = document.getElementById('video');
     const outputElement = document.getElementById('output');
+    const codeList = document.getElementById('codeList');
     const zoomRange = document.getElementById('zoomRange');
     const zoomValue = document.getElementById('zoomValue');
     const beep = document.getElementById('beep-sound');
-    const scannedCodesList = [];
+    const scannedCodesList = []; // <- Lista com todos os códigos lidos ou adicionados
 
-    let track = null;
+    let track = null; // <- Referência da câmera
 
+    // Quando clicar em "Iniciar Leitura"
     document.getElementById('startButton').addEventListener('click', () => {
       document.getElementById('scanner-container').style.display = 'block';
       document.getElementById('zoomControl').style.display = 'block';
       document.getElementById('startButton').style.display = 'none';
-      startScanner();
+      startScanner(); // <- Inicia a câmera
     });
 
+    // Função que ativa a câmera e o leitor de código
     async function startScanner() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         videoElement.srcObject = stream;
-
         track = stream.getVideoTracks()[0];
         const capabilities = track.getCapabilities();
 
@@ -136,30 +210,24 @@
           zoomRange.max = capabilities.zoom.max;
           zoomRange.step = capabilities.zoom.step || 0.1;
           zoomRange.value = 2;
-          applyZoom(2);
+          applyZoom(2); // <- Ajusta o zoom inicial
         }
 
+        // Quando o código for detectado
         codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
           if (result) {
             const code = result.getText();
             beep.currentTime = 0;
-            beep.play();
-
-            scannedCodesList.push(code);
-            const p = document.createElement('p');
-            const count = scannedCodesList.length;
-            const number = (count < 10 ? '0' : '') + count;
-            p.textContent = `${number} - ${code}`;
-            outputElement.appendChild(p);
-            outputElement.scrollTop = outputElement.scrollHeight;
+            beep.play(); // <- Toca som
+            addCodeToList(code); // <- Adiciona à lista
           }
         });
-
       } catch (err) {
         alert("Erro ao acessar câmera: " + err);
       }
     }
 
+    // Função para aplicar o zoom
     function applyZoom(zoom) {
       if (track) {
         const constraints = { advanced: [{ zoom }] };
@@ -169,17 +237,55 @@
       }
     }
 
+    // Atualiza visualmente o valor do zoom
     zoomRange.addEventListener('input', () => {
       const zoom = Number(zoomRange.value);
       zoomValue.textContent = zoom.toFixed(1);
       applyZoom(zoom);
     });
 
+    // Adiciona um código à lista visual e no array
+    function addCodeToList(code) {
+      if (!code) return;
+      const index = scannedCodesList.push(code);
+      const number = (index < 10 ? '0' : '') + index;
+
+      const div = document.createElement('div');
+      div.className = 'code-entry';
+      div.innerHTML = `
+        <span>${number} - ${code}</span>
+        <button class="remove-btn" onclick="removeCode(${index - 1}, this)">X</button>
+      `;
+      codeList.appendChild(div);
+      outputElement.scrollTop = outputElement.scrollHeight;
+    }
+
+    // Remove um código da lista (marca como nulo para não aparecer no CSV)
+    function removeCode(index, btn) {
+      scannedCodesList[index] = null;
+      btn.parentElement.remove();
+    }
+
+    // Adiciona manualmente um código digitado
+    function addManualCode() {
+      const manualInput = document.getElementById('manualCode');
+      const value = manualInput.value.trim();
+      if (value !== '') {
+        addCodeToList(value);
+        manualInput.value = '';
+      }
+    }
+
+    // Gera e baixa o CSV com os códigos
     function downloadCSV() {
       let csv = "Nº,Código de Barras\n";
+      let count = 1;
       scannedCodesList.forEach((code, index) => {
-        const number = (index + 1 < 10 ? '0' : '') + (index + 1);
-        csv += `${number},${code}\n`;
+        if (code !== null) {
+          const number = (count < 10 ? '0' : '') + count;
+          csv += `${number},${code}\n`;
+          count++;
+        }
       });
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
